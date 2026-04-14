@@ -1,7 +1,10 @@
 # Adapter
 
-Adapter is in charge of building a global graph and its inputs based on the fused op sequences returned by Capturer and user input.
+Adapter consumes the one-rank `GlobalGraph` seeded by `GraphBuilder` and rewrites it per `RuntimeConfig`: splitting nodes across ranks, inserting communication ops, adding cross-rank edges, and assigning stream ids so compute and communication can overlap. The result is the multi-rank multi-stream graph that the Runner executes.
 
+## Status
+
+Not yet implemented — [adapter.py](adapter.py) currently holds only an empty `Adapter` class. All features below are design targets.
 
 ## Features
 

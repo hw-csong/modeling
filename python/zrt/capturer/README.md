@@ -4,6 +4,8 @@ Uses `TorchDispatchMode` to intercept the full aten op sequence of a causal LM f
 
 No model weights need to be downloaded.
 
+> **Status:** [capturer.py](capturer.py) and [fusion.py](fusion.py) are empty stubs. The flow below describes the intended pipeline; actual capture logic has not yet been integrated into `zrt/`.
+
 ---
 
 ## Core Idea

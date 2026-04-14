@@ -17,7 +17,7 @@ A lightweight graph-based execution model for simulating LLM inference performan
 
 ## Architecture
 
-Four cooperating components under `python/zrt/`:
+Cooperating components under `python/zrt/`:
 
 ### Capturer (`capturer/`)
 Traces ATen-level operator sequences from HuggingFace model definitions (loaded on `torch.device("meta")` via `TorchDispatchMode`), records shapes/dtypes/module paths per op, and exports to CSV. The CSV is the boundary between capture and the rest of the system.
@@ -44,24 +44,40 @@ Cost models for simulating operator execution (memory + time):
 - **DB**: Looks up measured performance by op signature (inputs, dtype, shape).
 
 ### Common (`common/`)
-Shared primitives — tensor metadata, logging, small utilities — used by every component above.
+Shared primitives — `TensorBase` (shape + dtype metadata), `ChipSpec` (vendor-neutral compute/bandwidth/interconnect specs), and logging utilities — used by every component above.
+
+### Config (`config/`)
+`RuntimeConfig` + `ParallelConfig` dataclasses. Carries chip spec, parallelism sizes (TP/DP/EP, PD disaggregation), MTP settings, prefix-cache and chunked-prefill toggles. Consumed by the GraphBuilder and Adapter.
 
 ## Layout
 
 ```
 docs/                  # design docs
 python/zrt/            # core library ("Zhanlu Runtime")
-  capturer/            # HF → CSV op trace
-  graph/               # node types, graph builder, fusion
+  capturer/            # HF → op trace
+  graph/               # Node, Rank, GlobalGraph, GraphBuilder
   adapter/             # feature/parallelism rewrites → multi-rank multi-stream graph
   runner/              # topo-order simulator
-  ops/                 # cost models
-  common/              # logger, tensor base, utilities
+  ops/                 # cost models + OperatorBase registry
+  common/              # TensorBase, ChipSpec, logging
+  config/              # RuntimeConfig / ParallelConfig
 scripts/               # build / env / setup scripts
 tests/                 # pytest suite
-deepseek_v3_ops.csv    # reference op trace (DeepSeek-V3)
+  deepseek_v3_ops.csv  # reference op trace (DeepSeek-V3)
 ```
 
 ## Repo Status
 
-The repo is currently an early skeleton — most subdirectories under `python/zrt/` are empty. Treat the component descriptions above as the intended design, and verify actual file layout with `ls` before assuming a module exists.
+Early but no longer a pure skeleton. Current state:
+
+| Module | Status |
+|---|---|
+| `common/` | Implemented: `TensorBase`, `ChipSpec`, logging |
+| `graph/` | Implemented: `Node`, `Rank`, `GlobalGraph`, `GraphBuilder` (seeds one-rank copy) |
+| `runner/` | Implemented: 4-step simulator (op results → ideal timeline → contention correction → peak memory) |
+| `ops/` | Base only: `OperatorBase`, `OpResult`, `OpType`, `op_register` decorator. Theoretical / DB cost models not yet written |
+| `config/` | `RuntimeConfig`, `ParallelConfig` dataclasses |
+| `capturer/` | Empty stub classes; capture logic not yet integrated into `zrt/` |
+| `adapter/` | Empty stub; all parallelism/feature rewrites TODO |
+
+Tests only cover the runner (`tests/test_runner.py`). Verify actual file layout with `ls` before assuming a module exists.

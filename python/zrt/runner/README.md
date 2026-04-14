@@ -4,11 +4,12 @@ Runner is a lightweight graph-based LLM model runner. It takes a `GlobalGraph` a
 
 ## Simulation Workflow
 
-Simulation runs as a three-step pipeline:
+Simulation runs as a four-step pipeline:
 
-1. **Per-node duration** — query the `ops/` cost model for every node's ideal duration.
+1. **Per-node `OpResult`** — query the `ops/` cost model for every node. Duration is `OpResult.duration()`; memory footprint is `OpResult.peak_memory()`.
 2. **Ideal timeline** — topo-order walk that assigns `(start, end)` under same/cross-stream and cross-rank ordering rules, ignoring dual-stream contention.
 3. **Contention correction** — scan the ideal timeline, apply the dual-stream resource-sharing scale on overlapping windows, and propagate stretched durations to a fixed point.
+4. **Per-rank peak memory** — sweep alloc/free events over the final timeline and record the maximum concurrent footprint for each rank.
 
 The separation keeps step 2 a pure topo-order walk and confines the nonlinear part of the simulation to step 3.
 
@@ -56,7 +57,7 @@ Because stretching one node shifts the start times of its successors, correction
 
 ## Output
 
-Per node:
+Per node (`Runner.timings[node]`):
 
 | Field | Meaning |
 |-------|---------|
@@ -64,4 +65,13 @@ Per node:
 | `end` | Simulated end time (µs) |
 | `duration` | `end - start`, after contention correction |
 
-Aggregations (per rank, per stream, critical path, total latency, peak memory) are derived from these per-node timings.
+Per rank: `Runner.peak_memory[rank]` — peak concurrent live bytes over the rank's timeline.
+
+Aggregate: `Runner.total_latency()` — max end time across all nodes. Other aggregations (per-stream utilization, critical path, etc.) can be derived from the per-node timings.
+
+## Plug Points
+
+Both functions default to constants and are meant to be supplied by the caller:
+
+- `cost_fn: (Node, ChipSpec) -> OpResult` — normally dispatched through `ops/OP_CLASS_REGISTRY`.
+- `contention_fn: (Node, Node) -> float` — scale applied to the first node's duration when the two nodes overlap on the same rank's two streams.
